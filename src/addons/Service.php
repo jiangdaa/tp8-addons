@@ -12,6 +12,7 @@ use think\facade\Event;
 use think\facade\Lang;
 use think\Route;
 
+
 /**
  * 插件服务
  * Class Service
@@ -132,7 +133,7 @@ class Service extends \think\Service
         $this->registerRoutes(function (Route $route) {
             // 定义执行插件路由的闭包函数
             // 路由脚本
-            $execute = '\\think\\addons\\Route@execute';
+            $execute = '\\tp8a\\addons\\Route@execute';
             // 检查并导入插件的中间件
             // 注册插件公共中间件
 //            if (is_file($this->app->addons->getAddonsPath() . 'middleware.php')) {

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace tp8a;
 
+use think\App;
 use think\facade\Config;
 use think\facade\View;
-use think\utils\FileHelper;
+use tp8a\utils\FileHelper;
 
 abstract class Addons
 {
