@@ -12,6 +12,7 @@ use think\facade\Event;
 use think\facade\Lang;
 use think\Route;
 
+
 /**
  * 插件服务
  * Class Service
