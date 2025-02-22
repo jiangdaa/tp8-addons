@@ -1,0 +1,35 @@
+{
+    "name": "jiangdaa/tp8-addons",
+    "description": "tp8 插件系统",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "jiangdaa\\": "src/"
+        },
+        "files": [
+            "src/helper.php"
+        ]
+    },
+    "authors": [
+        {
+            "name": "jiangda",
+            "email": "jiangdaa@qq.com"
+        }
+    ],
+    "extra": {
+        "think": {
+            "services": [
+                "jiangdaa\\addons\\Service"
+            ],
+            "config": {
+                "addons": "src/config.php"
+            }
+        }
+    },
+    "require": {
+        "php": ">=8.1.0",
+        "topthink/framework": "^8.0",
+        "topthink/think-view": "^2.0",
+        "topthink/think-helper": "^3.0.0"
+    }
+}
