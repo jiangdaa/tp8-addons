@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace jiangdaa\utils;
+namespace tp8a\utils;
 
 class FileHelper
 {

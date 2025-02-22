@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace jiangdaa\addons;
+namespace tp8a\addons;
 
 use think\utils\FileHelper;
 use think\addons\middleware\Addons;

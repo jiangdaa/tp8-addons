@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace jiangdaa;
+namespace tp8a;
 
 use think\facade\Config;
 use think\facade\View;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace jiangdaa\addons\middleware;
+namespace tp8a\addons\middleware;
 
 use think\App;
 

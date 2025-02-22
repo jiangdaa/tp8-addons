@@ -4,7 +4,7 @@
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "jiangdaa\\": "src/"
+            "tp8a\\": "src/"
         },
         "files": [
             "src/helper.php"
@@ -19,7 +19,7 @@
     "extra": {
         "think": {
             "services": [
-                "jiangdaa\\addons\\Service"
+                "tp8a\\addons\\Service"
             ],
             "config": {
                 "addons": "src/config.php"
