@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace tp8a\addons;
 
-use think\utils\FileHelper;
-use think\addons\middleware\Addons;
+use tp8a\utils\FileHelper;
+use tp8a\addons\middleware\Addons;
 use think\facade\Cache;
 use think\facade\Config;
 use think\facade\Event;
@@ -330,7 +330,7 @@ class Service extends \think\Service
         // 获取插件的全局配置
         $config = Config::get('addons');
         // 获取ThinkPHP自带的插件类方法作为基线,用于后续比较
-        $base = get_class_methods("\\think\\Addons");
+        $base = get_class_methods("\\tp8a\\Addons");
         // 遍历插件目录下的所有文件,以寻找和注册插件的钩子
         foreach (glob($this->getAddonsPath() . '*/*.php') as $addons_file) {
             // 解析文件路径信息,获取插件名和文件名
