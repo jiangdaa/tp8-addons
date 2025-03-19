@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace tp8a\addons;
 
+use think\helper\Arr;
 use tp8a\utils\FileHelper;
 use tp8a\addons\middleware\Addons;
 use think\facade\Cache;
@@ -45,25 +46,19 @@ class Service extends \think\Service
         $this->app->bind('addons', Service::class);
     }
 
-    private function getRouteFile($addonName, $moduleName)
+    private function getConfigFile($addonName, $moduleName,$field)
     {
         $addonsPath = $this->app->addons->getAddonsPath();
         $routes = [];
-        if ($moduleName) {
-            $routeMapFile = $addonsPath
-                . $addonName . DIRECTORY_SEPARATOR
-                . $moduleName . DIRECTORY_SEPARATOR
-                . 'config' . DIRECTORY_SEPARATOR
-                . 'route.php';
-        } else {
-            $routeMapFile = $addonsPath
-                . $addonName . DIRECTORY_SEPARATOR
-                . 'config' . DIRECTORY_SEPARATOR
-                . 'route.php';
-        }
+        $routeMapFile = $addonsPath . $addonName . DIRECTORY_SEPARATOR . 'config.php';
         // 获取自定义的路由
         if (is_file($routeMapFile)) {
             $routes = include $routeMapFile;
+            if ($moduleName) {
+                $routes = Arr::get($routes, "{$field}.{$moduleName}", []);
+            } else {
+                $routes = Arr::get($routes, $field, []);
+            }
         }
         return $routes;
     }
@@ -81,7 +76,6 @@ class Service extends \think\Service
     private function loadAddonRoute()
     {
         $routes = [];
-        $middleware = [];
         $pathinfo = request()->pathinfo();
         if ($pathinfo && str_starts_with($pathinfo, 'addons/')) {
             list(, $addonName) = explode('/', $pathinfo);
@@ -89,13 +83,11 @@ class Service extends \think\Service
             if ($isModuleMode) {
                 $urlChunks = explode('/', $pathinfo);
                 list(, , $moduleName) = $urlChunks;
-                $configs = $this->getRouteFile($addonName, $moduleName);
-                $routes = $configs['routes'] ?? [];
-                $middleware = $configs['middleware'] ?? [];
+                $routes = $this->getConfigFile($addonName, $moduleName,'routes');
+                $middleware = $this->getConfigFile($addonName, $moduleName,'middleware');
             } else {
-                $configs = $this->getRouteFile($addonName, '');
-                $routes = $configs['routes'] ?? [];
-                $middleware = $configs['middleware'] ?? [];
+                $routes = $this->getConfigFile($addonName, '','routes');
+                $middleware = $this->getConfigFile($addonName, '','middleware');
             }
             $this->app->middleware->import($middleware, 'route');
         } else {

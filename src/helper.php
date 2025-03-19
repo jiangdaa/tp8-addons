@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use app\common\exception\BusinessException;
+use think\facade\Db;
 use think\facade\Event;
 use think\facade\Route;
 use think\facade\App;
@@ -42,7 +44,7 @@ if (!function_exists('hook')) {
      * @param bool $once 指定钩子是否只执行一次.如果设置为true,则在第一次触发后取消订阅
      * @return mixed 返回钩子执行的结果,通常是字符串拼接的结果,也可以是其他数据类型
      */
-    function hook($event, $params = null, bool $once = false)
+    function hook(string $event, array $params = null, bool $once = false)
     {
         // 触发事件,调用所有订阅了此事件的钩子函数,并根据$once参数决定是否只执行一次
         $result = Event::trigger($event, $params, $once);
@@ -62,7 +64,7 @@ if (!function_exists('get_addons_info')) {
      * @param string $name 插件的名称.用于唯一标识一个插件
      * @return mixed|array 如果插件存在并成功实例化,返回插件的信息数组;否则,返回空数组
      */
-    function get_addons_info($name)
+    function get_addons_info(string $name): mixed
     {
         // 实例化指定名称的插件
         $addon = get_addons_instance($name);
@@ -86,7 +88,7 @@ if (!function_exists('set_addons_info')) {
      * @param array $array 一个包含插件新配置信息的数组.如果未提供数组,则默认为空数组
      * @return mixed|bool 如果插件不存在或无法实例化,返回空数组;如果成功更新插件信息,返回插件实例的更新结果
      */
-    function set_addons_info($name = '', $array = [])
+    function set_addons_info(string $name = '', array $array = []): mixed
     {
         // 实例化指定名称的插件
         $addon = get_addons_instance($name);
@@ -113,7 +115,7 @@ if (!function_exists('get_addons_config')) {
      * @return mixed|array 如果插件存在并成功获取配置,则返回配置信息,这可以是一个数组或其它类型的值
      *                    如果插件不存在或获取配置失败,则返回一个空数组
      */
-    function get_addons_config($name, $type = false)
+    function get_addons_config(string $name, bool $type = false): mixed
     {
         // 获取指定插件的实例.
         $addon = get_addons_instance($name);
@@ -134,7 +136,7 @@ if (!function_exists('set_addons_config')) {
      * @param array $array 新的配置信息数组.如果未指定配置数组,则默认为空数组
      * @return mixed|bool 如果插件不存在,则返回空数组.如果插件存在且配置更新成功,则返回true.否则,返回false
      */
-    function set_addons_config($name = '', $array = [])
+    function set_addons_config(string $name = '', array $array = []): mixed
     {
         // 获取指定插件的实例
         $addon = get_addons_instance($name);
@@ -158,7 +160,7 @@ if (!function_exists('get_addons_instance')) {
      * @param string $name 插件的名称.这是用于唯一标识插件的字符串
      * @return mixed|null 返回插件的实例对象,如果插件不存在或无法实例化,则返回null
      */
-    function get_addons_instance($name)
+    function get_addons_instance($name): mixed
     {
         // 使用静态变量存储已实例化的插件,避免重复实例化
         static $_addons = [];
@@ -189,10 +191,10 @@ if (!function_exists('get_addons_class')) {
      *
      * @param string $name 插件的名称.这是用于唯一标识插件的字符串
      * @param string $type 类的类型.用于确定生成类名的命名空间.默认为'hook'
-     * @param string $class 可选的类名片段.当需要指定插件中的特定类时使用,可以是类的路径片段
+     * @param string|null $class 可选的类名片段.当需要指定插件中的特定类时使用,可以是类的路径片段
      * @return mixed|string 返回插件类的完全限定名,如果类不存在则返回空字符串
      */
-    function get_addons_class($name, $type = 'hook', $class = null, string $module = '')
+    function get_addons_class(string $name, string $type = 'hook', string $class = null, string $module = ''): mixed
     {
         // 移除$name中的前后空格
         $name = trim($name);
@@ -210,15 +212,15 @@ if (!function_exists('get_addons_class')) {
         }
         // 根据$type生成插件类的命名空间
         switch ($type) {
-                // 如果$type为'controller',则生成控制器的命名空间
+            // 如果$type为'controller',则生成控制器的命名空间
             case 'controller':
-                if($module){
+                if ($module) {
                     $namespace = '\\addons\\' . $name . '\\' . $module . '\\controller\\' . $class;
-                }else{
+                } else {
                     $namespace = '\\addons\\' . $name . '\\controller\\' . $class;
                 }
                 break;
-                // 默认情况下,生成插件基类的命名空间
+            // 默认情况下,生成插件基类的命名空间
             default:
                 $namespace = '\\addons\\' . $name . '\\Plugin';
         }
@@ -240,7 +242,7 @@ if (!function_exists('addons_url')) {
      * @param bool|string $domain 是否使用域名,可以是true（使用配置的默认域名）或者具体的域名字符串
      * @return mixed|bool|string 返回生成的URL字符串,如果无法生成则返回false
      */
-    function addons_url($url = '', $param = [], $suffix = true, $domain = false)
+    function addons_url(string $url = '', array $param = [], bool|string $suffix = true, bool|string $domain = false): mixed
     {
         /* 获取当前应用的请求对象 */
         $request = app('request');
@@ -279,5 +281,362 @@ if (!function_exists('addons_url')) {
         }
         /* 使用解析出的插件、控制器和操作,以及参数数组,构建URL,并根据需要设置后缀和域名 */
         return Route::buildUrl("@addons/{$addons}/{$controller}/{$action}", $param)->suffix($suffix)->domain($domain);
+    }
+}
+
+if (!function_exists('addons_config')) {
+
+    function addons_config(string $field)
+    {
+        $configPath = get_addon_path() . DIRECTORY_SEPARATOR . 'config.php';
+        if (is_file($configPath)) {
+            $res = require $configPath;
+            return $res[$field] ?? null;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('addon_reg_menu')) {
+    /**
+     * 注册菜单
+     * @param string $name
+     * @param string $path
+     * @param string $type
+     * @param array $children
+     * @param string $icon
+     * @return string[]
+     */
+    function addon_reg_menu(string $name, string $path, string $type, array $children = [], string $icon = ''): array
+    {
+        if (!str_starts_with($path, '/addons')) {
+            $addonName = addon_name();
+            $path = "/addons/{$addonName}/{$path}";
+        }
+        $m = ['name' => $name, 'icon' => $icon, 'path' => $path, 'type' => $type];
+        if (count($children)) {
+            $m['children'] = $children;
+        }
+        return $m;
+    }
+}
+
+if (!function_exists('addon_import_sql')) {
+
+    /**
+     * 导入插件sql
+     * @return bool
+     */
+    function addon_import_sql(): bool
+    {
+        $fileName = 'install.sql';
+        $sqlFile = root_path('addons/' . addon_name()) . DIRECTORY_SEPARATOR . $fileName;
+        $dbConfig = addons_config('db');
+
+        if (is_file($sqlFile)) {
+            $lines = file($sqlFile);
+            $templine = '';
+            foreach ($lines as $line) {
+                if (substr($line, 0, 2) == '--' || $line == '' || substr($line, 0, 2) == '/*') {
+                    continue;
+                }
+                $templine .= $line;
+                if (substr(trim($line), -1, 1) == ';') {
+                    $templine = str_ireplace('__PREFIX__', $dbConfig['prefix'], $templine);
+                    $templine = str_ireplace('INSERT INTO ', 'INSERT IGNORE INTO ', $templine);
+                    try {
+                        Db::execute($templine);
+                    } catch (\PDOException $e) {
+                        //$e->getMessage();
+                    }
+                    $templine = '';
+                }
+            }
+        }
+        return true;
+    }
+}
+
+if (!function_exists('addon_db_tables')) {
+
+    /**
+     * 获取插件创建的表
+     * @param string $name 插件名
+     * @return array
+     */
+    function addon_db_tables(string $name): array
+    {
+        $regex = "/^CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z_]+)`?/mi";
+        $sqlFile = root_path('addons/' . $name) . DIRECTORY_SEPARATOR . 'install.sql';
+        $dbConfig = addons_config('db');
+        $tables = [];
+        if (is_file($sqlFile)) {
+            preg_match_all($regex, file_get_contents($sqlFile), $matches);
+            if ($matches && isset($matches[2]) && $matches[2]) {
+                $prefix = $dbConfig['prefix'];
+                $tables = array_map(function ($item) use ($prefix) {
+                    return str_replace("__PREFIX__", $prefix, $item);
+                }, $matches[2]);
+            }
+        }
+        return $tables;
+    }
+
+}
+
+if (!function_exists('addon_remove_sql')) {
+    /**
+     * 移除导入的sql
+     * @return bool
+     */
+    function addon_remove_sql(): bool
+    {
+        $tables = addon_db_tables(addon_name());
+        $dbConfig = addons_config('db');
+        $prefix = $dbConfig['prefix'] ?? false;
+        if (!$prefix) {
+            return false;
+        }
+        try {
+            //删除插件关联表
+            foreach ($tables as $table) {
+                //忽略非插件标识的表名
+                if (!preg_match("/^{$prefix}/", $table)) {
+                    continue;
+                }
+                Db::execute("DROP TABLE IF EXISTS `{$table}`");
+            }
+        } catch (\Exception $exception) {
+            return false;
+        }
+        return true;
+    }
+}
+
+if (!function_exists('addon_export_sql')) {
+
+    /**
+     * 导出插件的表数据和结构
+     * @return void
+     */
+    function addon_export_sql(): void
+    {
+        $addonConfig = addons_config('db');
+
+        $tablePrefix = '';
+        if ($addonConfig && array_key_exists('prefix', $addonConfig) && $addonConfig['prefix']) {
+            $tablePrefix = $addonConfig['prefix'];
+        }
+        if (empty($tablePrefix)) return;
+        // 获取数据库连接
+        $db = Db::connect();
+
+        // 获取所有表
+        $tables = $db->query("SHOW TABLES");
+
+        // 创建 SQL 文件
+        $sqlFile = get_addon_path() . DIRECTORY_SEPARATOR . time() . '.sql';
+        file_put_contents($sqlFile, "SET NAMES utf8mb4;\n\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
+        // 遍历表
+        $dbName = env('DATABASE.DB_NAME');
+        foreach ($tables as $table) {
+            $table_name = $table['Tables_in_' . $dbName]; // 获取表名
+            if (str_starts_with($table_name, $tablePrefix)) {
+                // 导出表结构
+                $createTableSql = $db->query("SHOW CREATE TABLE `$table_name`")[0]['Create Table'];
+                file_put_contents($sqlFile, "\nDROP TABLE IF EXISTS `$table_name`;" . "\n" . $createTableSql . ";\n\n", FILE_APPEND);
+
+                // 导出数据
+                $data = $db->query("SELECT * FROM `$table_name`");
+                $insertSql = "BEGIN;\n";
+                foreach ($data as $row) {
+                    $columns = array_keys($row);
+                    $values = array_map(function ($value) {
+                        return is_null($value) ? 'NULL' : "'" . addslashes($value) . "'";
+                    }, array_values($row));
+                    $insertSql .= "INSERT INTO `$table_name` (`" . implode('`, `', $columns) . "`) VALUES (" . implode(', ', $values) . ");\n";
+                }
+                $insertSql .= "COMMIT;";
+                file_put_contents($sqlFile, $insertSql, FILE_APPEND);
+            }
+        }
+        file_put_contents($sqlFile, "\n\nSET FOREIGN_KEY_CHECKS = 1;", FILE_APPEND);
+    }
+}
+
+if (!function_exists('addon_resource_copy')) {
+
+    /**
+     * 复制插件包资源文件
+     * @param $src
+     * @param $dst
+     * @return void
+     */
+    function addon_resource_copy($src, $dst): void
+    {  // 原目录，复制到的目录
+        if (!$src) {
+            $src = get_addon_path() . DIRECTORY_SEPARATOR . 'assets';
+        }
+        if (!$dst) {
+            $dst = public_path('addons' . addon_name());
+        }
+        $dir = opendir($src);
+        @mkdir($dst);
+        while (false !== ($file = readdir($dir))) {
+            if (($file != '.') && ($file != '..')) {
+                if (is_dir($src . DIRECTORY_SEPARATOR . $file)) {
+                    addon_resource_copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
+                } else {
+                    copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
+                }
+            }
+        }
+        closedir($dir);
+    }
+
+}
+
+if (!function_exists('addon_resource_remove')) {
+
+    /**
+     * 删除插件资源文件
+     * @param string|null $dir
+     * @return void
+     */
+    function addon_resource_remove(string $dir = null): void
+    {
+        if (!$dir) {
+            $dir = public_path('addons' . addon_name());
+        }
+        $dh = @opendir($dir);
+        if (!$dh) return;
+        while ($file = @readdir($dh)) {
+            if ($file != "." && $file != "..") {
+                $fullPath = $dir . DIRECTORY_SEPARATOR . $file;
+                if (!is_dir($fullPath)) {
+                    @unlink($fullPath);
+                } else {
+                    addon_resource_remove($fullPath);
+                }
+            }
+        }
+        closedir($dh);
+        @rmdir($dir);
+    }
+}
+
+if (!function_exists('get_addon_path')) {
+
+    /**
+     * 获取插件路径
+     * @param string $addonName
+     * @return string
+     */
+    function get_addon_path(string $addonName = null): string
+    {
+        if (!$addonName) {
+            $addonName = addon_name();
+        }
+        return root_path('addons') . $addonName;
+    }
+
+}
+
+if (!function_exists('addon_name')) {
+
+    /**
+     * 获取插件名称
+     * @return array|mixed|string|null
+     */
+    function addon_name(): mixed
+    {
+        $addon = request()->param('addon');
+        if (!$addon) {
+            $backtrace = debug_backtrace();
+            $keyword = DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR;
+            // 获取第一个非内核函数的信息
+            foreach ($backtrace as $item) {
+                if (array_key_exists('file', $item)) {
+                    $file = $item['file'];
+                    if (str_contains($file, $keyword)) {
+                        if (str_ends_with($file, 'Plugin.php')) {
+                            $arr = explode(DIRECTORY_SEPARATOR, substr($file, strpos($file, $keyword)));
+                            $addon = $arr[count($arr) - 2];
+                            break;
+                        } else {
+                            list(, , $addon) = explode(DIRECTORY_SEPARATOR, substr($file, strpos($file, $keyword)));
+                            break;
+                        }
+                    }
+                }
+
+            }
+        }
+        if (!$addon) {
+            return null;
+        }
+        return $addon;
+    }
+
+}
+
+if (!function_exists('addon_resource_copy')) {
+
+    /**
+     * 复制插件包资源文件
+     * @param $src
+     * @param $dst
+     * @return void
+     */
+    function addon_resource_copy($src = null, $dst = null): void
+    {  // 原目录，复制到的目录
+        if (!$src) {
+            $src = get_addon_path() . DIRECTORY_SEPARATOR . 'assets';
+        }
+        if (!$dst) {
+            $dst = public_path('addons' . DIRECTORY_SEPARATOR . addon_name());
+        }
+        $dir = opendir($src);
+        @mkdir($dst);
+        while (false !== ($file = readdir($dir))) {
+            if (($file != '.') && ($file != '..')) {
+                if (is_dir($src . DIRECTORY_SEPARATOR . $file)) {
+                    addon_resource_copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
+                } else {
+                    copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
+                }
+            }
+        }
+        closedir($dir);
+    }
+
+}
+
+if (!function_exists('addon_resource_remove')) {
+
+    /**
+     * 删除插件资源文件
+     * @param string|null $dir
+     * @return void
+     */
+    function addon_resource_remove(string $dir = null): void
+    {
+        if (!$dir) {
+            $dir = public_path('addons' .DIRECTORY_SEPARATOR. addon_name());
+        }
+        $dh = @opendir($dir);
+        if (!$dh) return;
+        while ($file = @readdir($dh)) {
+            if ($file != "." && $file != "..") {
+                $fullPath = $dir . DIRECTORY_SEPARATOR . $file;
+                if (!is_dir($fullPath)) {
+                    @unlink($fullPath);
+                } else {
+                    addon_resource_remove($fullPath);
+                }
+            }
+        }
+        closedir($dh);
+        @rmdir($dir);
     }
 }
