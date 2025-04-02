@@ -27,7 +27,7 @@ class Service extends \think\Service
      * 该方法初始化插件的各个组成部分,包括加载语言包、自动加载插件、加载插件事件和服务
      * 它还绑定了插件服务到应用容器
      */
-    public function register(): void
+    public function register()
     {
         // 设置插件路径,用于后续插件的查找和加载
         $this->addons_path = $this->getAddonsPath();
@@ -129,7 +129,7 @@ class Service extends \think\Service
      * 应用启动时执行的函数
      * 主要用于注册插件的路由规则
      */
-    public function boot(): void
+    public function boot()
     {
         // 注册路由规则
         $this->registerRoutes(function (Route $route) {
@@ -208,7 +208,7 @@ class Service extends \think\Service
      *
      * 此函数通过动态加载插件的事件钩子,实现了插件对应用功能的扩展
      */
-    private function loadEvent(): void
+    private function loadEvent()
     {
         // 根据应用的调试状态决定是否使用缓存中的钩子信息
         $hooks = $this->app->isDebug() ? [] : Cache::get('hooks', []);
@@ -248,7 +248,7 @@ class Service extends \think\Service
      * 然后解析这些配置文件,将插件的服务与相应的类绑定
      * 这样,应用程序在需要使用这些服务时,可以方便地通过依赖注入来获取
      */
-    private function loadService(): void
+    private function loadService()
     {
         // 获取插件目录中的所有文件和目录
         $results = scandir($this->addons_path);
@@ -292,9 +292,9 @@ class Service extends \think\Service
      * 自动加载插件的函数
      * 该函数用于在满足特定条件下自动加载插件,并更新配置以注册插件的钩子
      * 如果配置中未开启自动加载插件,则直接返回true
-     * @return mixed|bool 返回值取决于配置是否开启自动加载插件
+     * @return mixed 返回值取决于配置是否开启自动加载插件
      */
-    private function autoload(): mixed
+    private function autoload()
     {
         // 检查是否开启自动加载插件的配置,如果未开启,则直接返回true
         if (!Config::get('addons.autoload', true)) {
@@ -343,9 +343,9 @@ class Service extends \think\Service
      * 如果插件目录不存在,则会尝试创建该目录
      * 这样确保了后续操作可以正确地在插件目录中进行
      *
-     * @return mixed|string 返回插件目录的路径.如果无法创建目录或获取路径失败,可能返回错误信息
+     * @return string 返回插件目录的路径.如果无法创建目录或获取路径失败,可能返回错误信息
      */
-    public function getAddonsPath(): mixed
+    public function getAddonsPath()
     {
         // 构建插件目录的路径
         $addons_path = $this->app->getRootPath() . 'addons' . DIRECTORY_SEPARATOR;
@@ -368,7 +368,7 @@ class Service extends \think\Service
      *
      * @return mixed|array 返回插件的配置信息.如果插件不存在或无法实例化,则返回空数组
      */
-    public function getAddonsConfig(): mixed
+    public function getAddonsConfig()
     {
         // 通过应用的请求对象获取当前请求的插件名称
         $name = $this->app->request->addon;
