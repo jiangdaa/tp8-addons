@@ -46,7 +46,7 @@ class Service extends \think\Service
         $this->app->bind('addons', Service::class);
     }
 
-    private function getConfigFile($addonName, $moduleName,$field)
+    private function getConfigFile($addonName, $moduleName, $field)
     {
         $addonsPath = $this->app->addons->getAddonsPath();
         $routes = [];
@@ -77,17 +77,23 @@ class Service extends \think\Service
     {
         $routes = [];
         $pathinfo = request()->pathinfo();
+        $middleware = [];
         if ($pathinfo && str_starts_with($pathinfo, 'addons/')) {
             list(, $addonName) = explode('/', $pathinfo);
             $isModuleMode = $this->getMultiApps($addonName);
             if ($isModuleMode) {
                 $urlChunks = explode('/', $pathinfo);
                 list(, , $moduleName) = $urlChunks;
-                $routes = $this->getConfigFile($addonName, $moduleName,'routes');
-                $middleware = $this->getConfigFile($addonName, $moduleName,'middleware');
+                $routes = $this->getConfigFile($addonName, $moduleName, 'routes');
+                $tempMiddleware = $this->getConfigFile($addonName, $moduleName, 'middleware');
             } else {
-                $routes = $this->getConfigFile($addonName, '','routes');
-                $middleware = $this->getConfigFile($addonName, '','middleware');
+                $routes = $this->getConfigFile($addonName, '', 'routes');
+                $tempMiddleware = $this->getConfigFile($addonName, '', 'middleware');
+            }
+            foreach ($tempMiddleware as $item) {
+                if (is_string($item) && class_exists($item)) {
+                    $middleware[] = $item;
+                }
             }
             $this->app->middleware->import($middleware, 'route');
         } else {
@@ -100,18 +106,23 @@ class Service extends \think\Service
                     if ($info) {
                         // 多应用
                         foreach ($info as $app) {
-                            $configs = $this->getRouteFile($addonsDir, $app);
-                            $routes = array_merge($routes, $configs['routes'] ?? []);
+                            $routes = array_merge($routes, $this->getConfigFile($addonsDir, $app, 'route'));
+                            $middleware = array_merge($middleware, $this->getConfigFile($addonsDir, $app, 'middleware'));
                         }
                     } else {
                         // 单应用
-                        $configs = $this->getRouteFile($addonsDir, false);
-                        $routes = array_merge($routes, $configs['routes'] ?? []);
+                        $routes = $this->getConfigFile($addonsDir, '', 'route');
+                        $tempMiddleware = $this->getConfigFile($addonsDir, '', 'middleware');
+                        foreach ($tempMiddleware as $item) {
+                            if (is_string($item) && class_exists($item)) {
+                                $middleware[] = $item;
+                            }
+                        }
                     }
                 }
             }
+            $this->app->middleware->import($middleware, 'route');
         }
-
         return $routes;
     }
 
@@ -127,11 +138,6 @@ class Service extends \think\Service
             // 路由脚本
             $execute = '\\tp8a\\addons\\Route@execute';
             // 检查并导入插件的中间件
-            // 注册插件公共中间件
-//            if (is_file($this->app->addons->getAddonsPath() . 'middleware.php')) {
-//                $this->app->middleware->import(include $this->app->addons->getAddonsPath() . 'middleware.php', 'route');
-//            }
-            // 注册默认的插件路由规则
             // 注册控制器路由
             $route->rule("addons/:addon/[:module]/:controller/:action$", $execute)->middleware(Addons::class);
             // 从配置中获取自定义的插件路由规则
@@ -144,71 +150,46 @@ class Service extends \think\Service
                 if (!$val) {
                     continue;
                 }
-                // 处理包含域名的路由配置
-                if (is_array($val)) {
-                    $domain = $val['domain'];
-                    $rules = [];
-                    foreach ($val['rule'] as $k => $rule) {
-                        // 解析路由规则并构建规则数组
-                        [$addon, $controller, $action] = explode('/', $rule);
-                        $rules[$k] = [
-                            'addon' => $addon,
-                            'controller' => $controller,
-                            'action' => $action,
-                            'indomain' => 1,
-                        ];
-                    }
-                    // 动态注册域名路由
-                    $route->domain($domain, function () use ($rules, $route, $execute) {
-                        // 动态注册域名的路由规则
-                        foreach ($rules as $k => $rule) {
-                            $route->rule($k, $execute)
-                                ->name($k)
-                                ->completeMatch(true)
-                                ->append($rule);
-                        }
-                    });
-                } else {
-                    if (str_starts_with($val, '/addons/')) {
-                        $count = 1;
-                        $val = str_replace('/addons/', '', $val, $count);
-                    }
-                    if (str_starts_with($val, '/')) {
-                        $val = mb_substr($val, 1);
-                    }
-                    // 处理不包含域名的路由配置
-                    // 解析路由规则并构建规则数组
-                    $r = explode('/', $val);
-                    list($addon) = $r;
-                    $apps = $this->getMultiApps($addon);
-                    if ($addon) {
-
-                        if ($apps) {
-                            list(, $app, $controller, $action) = $r;
-                            if (in_array($app, $apps)) {
-                                $route->rule($key, $execute)
-                                    ->name($key)
-                                    ->completeMatch(true)
-                                    ->append([
-                                        'addon' => $addon,
-                                        'module' => $app,
-                                        'controller' => $controller,
-                                        'action' => $action
-                                    ]);
-                            }
-
-                        } else {
-                            list(, $controller, $action) = $r;
-
+                if (!is_string($val)){
+                    continue;
+                }
+                if (str_starts_with($val, '/addons/')) {
+                    $count = 1;
+                    $val = str_replace('/addons/', '', $val, $count);
+                }
+                if (str_starts_with($val, '/')) {
+                    $val = mb_substr($val, 1);
+                }
+                // 处理不包含域名的路由配置
+                // 解析路由规则并构建规则数组
+                $r = explode('/', $val);
+                list($addon) = $r;
+                $apps = $this->getMultiApps($addon);
+                if ($addon) {
+                    if ($apps) {
+                        list(, $app, $controller, $action) = $r;
+                        if (in_array($app, $apps)) {
                             $route->rule($key, $execute)
                                 ->name($key)
                                 ->completeMatch(true)
                                 ->append([
                                     'addon' => $addon,
+                                    'module' => $app,
                                     'controller' => $controller,
                                     'action' => $action
                                 ]);
                         }
+
+                    } else {
+                        list(, $controller, $action) = $r;
+                        $route->rule($key, $execute)
+                            ->name($key)
+                            ->completeMatch(true)
+                            ->append([
+                                'addon' => $addon,
+                                'controller' => $controller,
+                                'action' => $action
+                            ]);
                     }
                 }
 
