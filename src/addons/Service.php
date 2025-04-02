@@ -6,7 +6,6 @@ namespace tp8a\addons;
 
 use think\helper\Arr;
 use tp8a\utils\FileHelper;
-use tp8a\addons\middleware\Addons;
 use think\facade\Cache;
 use think\facade\Config;
 use think\facade\Event;
@@ -28,7 +27,7 @@ class Service extends \think\Service
      * 该方法初始化插件的各个组成部分,包括加载语言包、自动加载插件、加载插件事件和服务
      * 它还绑定了插件服务到应用容器
      */
-    public function register()
+    public function register(): void
     {
         // 设置插件路径,用于后续插件的查找和加载
         $this->addons_path = $this->getAddonsPath();
@@ -130,7 +129,7 @@ class Service extends \think\Service
      * 应用启动时执行的函数
      * 主要用于注册插件的路由规则
      */
-    public function boot()
+    public function boot(): void
     {
         // 注册路由规则
         $this->registerRoutes(function (Route $route) {
@@ -139,7 +138,7 @@ class Service extends \think\Service
             $execute = '\\tp8a\\addons\\Route@execute';
             // 检查并导入插件的中间件
             // 注册控制器路由
-            $route->rule("addons/:addon/[:module]/:controller/:action$", $execute)->middleware(Addons::class);
+            $route->rule("addons/:addon/[:module]/:controller/:action$", $execute);
             // 从配置中获取自定义的插件路由规则
             // 自定义路由
             $routes = (array)Config::get('addons.route', []);
@@ -209,7 +208,7 @@ class Service extends \think\Service
      *
      * 此函数通过动态加载插件的事件钩子,实现了插件对应用功能的扩展
      */
-    private function loadEvent()
+    private function loadEvent(): void
     {
         // 根据应用的调试状态决定是否使用缓存中的钩子信息
         $hooks = $this->app->isDebug() ? [] : Cache::get('hooks', []);
@@ -249,7 +248,7 @@ class Service extends \think\Service
      * 然后解析这些配置文件,将插件的服务与相应的类绑定
      * 这样,应用程序在需要使用这些服务时,可以方便地通过依赖注入来获取
      */
-    private function loadService()
+    private function loadService(): void
     {
         // 获取插件目录中的所有文件和目录
         $results = scandir($this->addons_path);
@@ -295,7 +294,7 @@ class Service extends \think\Service
      * 如果配置中未开启自动加载插件,则直接返回true
      * @return mixed|bool 返回值取决于配置是否开启自动加载插件
      */
-    private function autoload()
+    private function autoload(): mixed
     {
         // 检查是否开启自动加载插件的配置,如果未开启,则直接返回true
         if (!Config::get('addons.autoload', true)) {
@@ -346,7 +345,7 @@ class Service extends \think\Service
      *
      * @return mixed|string 返回插件目录的路径.如果无法创建目录或获取路径失败,可能返回错误信息
      */
-    public function getAddonsPath()
+    public function getAddonsPath(): mixed
     {
         // 构建插件目录的路径
         $addons_path = $this->app->getRootPath() . 'addons' . DIRECTORY_SEPARATOR;
@@ -369,7 +368,7 @@ class Service extends \think\Service
      *
      * @return mixed|array 返回插件的配置信息.如果插件不存在或无法实例化,则返回空数组
      */
-    public function getAddonsConfig()
+    public function getAddonsConfig(): mixed
     {
         // 通过应用的请求对象获取当前请求的插件名称
         $name = $this->app->request->addon;

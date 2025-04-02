@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use app\common\exception\BusinessException;
 use think\facade\Db;
 use think\facade\Event;
 use think\facade\Route;
@@ -40,11 +39,11 @@ if (!function_exists('hook')) {
      * 这是插件系统的核心功能之一,它使得主题和插件可以无侵入地扩展和修改应用程序的行为
      *
      * @param string $event 钩子的名称,标识要触发的事件
-     * @param array|null $params 传递给钩子函数的参数,可以是单个参数或参数数组
+     * @param mixed $params 传递给钩子函数的参数,可以是单个参数或参数数组
      * @param bool $once 指定钩子是否只执行一次.如果设置为true,则在第一次触发后取消订阅
      * @return mixed 返回钩子执行的结果,通常是字符串拼接的结果,也可以是其他数据类型
      */
-    function hook(string $event, array $params = null, bool $once = false)
+    function hook(string $event, mixed $params = null, bool $once = false)
     {
         // 触发事件,调用所有订阅了此事件的钩子函数,并根据$once参数决定是否只执行一次
         $result = Event::trigger($event, $params, $once);
