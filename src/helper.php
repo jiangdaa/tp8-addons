@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use app\common\exception\BusinessException;
 use think\facade\Db;
 use think\facade\Event;
 use think\facade\Route;
@@ -40,11 +39,11 @@ if (!function_exists('hook')) {
      * 这是插件系统的核心功能之一,它使得主题和插件可以无侵入地扩展和修改应用程序的行为
      *
      * @param string $event 钩子的名称,标识要触发的事件
-     * @param array|null $params 传递给钩子函数的参数,可以是单个参数或参数数组
+     * @param mixed $params 传递给钩子函数的参数,可以是单个参数或参数数组
      * @param bool $once 指定钩子是否只执行一次.如果设置为true,则在第一次触发后取消订阅
      * @return mixed 返回钩子执行的结果,通常是字符串拼接的结果,也可以是其他数据类型
      */
-    function hook(string $event, array $params = null, bool $once = false)
+    function hook(string $event, mixed $params = null, bool $once = false)
     {
         // 触发事件,调用所有订阅了此事件的钩子函数,并根据$once参数决定是否只执行一次
         $result = Event::trigger($event, $params, $once);
@@ -286,9 +285,12 @@ if (!function_exists('addons_url')) {
 
 if (!function_exists('addons_config')) {
 
-    function addons_config(string $field)
+    function addons_config(string $field, string $name): mixed
     {
-        $configPath = get_addon_path() . DIRECTORY_SEPARATOR . 'config.php';
+        if (!$name) {
+            $name = addon_name();
+        }
+        $configPath = get_addon_path($name) . DIRECTORY_SEPARATOR . 'config.php';
         if (is_file($configPath)) {
             $res = require $configPath;
             return $res[$field] ?? null;
@@ -327,11 +329,14 @@ if (!function_exists('addon_import_sql')) {
      * 导入插件sql
      * @return bool
      */
-    function addon_import_sql(): bool
+    function addon_import_sql(string $name = ''): bool
     {
+        if (!$name) {
+            $name = addon_name();
+        }
         $fileName = 'install.sql';
-        $sqlFile = root_path('addons/' . addon_name()) . DIRECTORY_SEPARATOR . $fileName;
-        $dbConfig = addons_config('db');
+        $sqlFile = root_path('addons/' . $name) . DIRECTORY_SEPARATOR . $fileName;
+        $dbConfig = addons_config('db', $name);
 
         if (is_file($sqlFile)) {
             $lines = file($sqlFile);
@@ -344,11 +349,7 @@ if (!function_exists('addon_import_sql')) {
                 if (substr(trim($line), -1, 1) == ';') {
                     $templine = str_ireplace('__PREFIX__', $dbConfig['prefix'], $templine);
                     $templine = str_ireplace('INSERT INTO ', 'INSERT IGNORE INTO ', $templine);
-                    try {
-                        Db::execute($templine);
-                    } catch (\PDOException $e) {
-                        //$e->getMessage();
-                    }
+                    Db::execute($templine);
                     $templine = '';
                 }
             }
@@ -364,11 +365,14 @@ if (!function_exists('addon_db_tables')) {
      * @param string $name 插件名
      * @return array
      */
-    function addon_db_tables(string $name): array
+    function addon_db_tables(string $name = ''): array
     {
+        if (!$name) {
+            $name = addon_name();
+        }
         $regex = "/^CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z_]+)`?/mi";
         $sqlFile = root_path('addons/' . $name) . DIRECTORY_SEPARATOR . 'install.sql';
-        $dbConfig = addons_config('db');
+        $dbConfig = addons_config('db', $name);
         $tables = [];
         if (is_file($sqlFile)) {
             preg_match_all($regex, file_get_contents($sqlFile), $matches);
@@ -389,10 +393,13 @@ if (!function_exists('addon_remove_sql')) {
      * 移除导入的sql
      * @return bool
      */
-    function addon_remove_sql(): bool
+    function addon_remove_sql(string $name = ''): bool
     {
-        $tables = addon_db_tables(addon_name());
-        $dbConfig = addons_config('db');
+        if (!$name) {
+            $name = addon_name();
+        }
+        $tables = addon_db_tables($name);
+        $dbConfig = addons_config('db', $name);
         $prefix = $dbConfig['prefix'] ?? false;
         if (!$prefix) {
             return false;
@@ -419,9 +426,12 @@ if (!function_exists('addon_export_sql')) {
      * 导出插件的表数据和结构
      * @return void
      */
-    function addon_export_sql(): void
+    function addon_export_sql(string $name = '', bool $over = false): void
     {
-        $addonConfig = addons_config('db');
+        if (!$name) {
+            $name = addon_name();
+        }
+        $addonConfig = addons_config('db', $name);
 
         $tablePrefix = '';
         if ($addonConfig && array_key_exists('prefix', $addonConfig) && $addonConfig['prefix']) {
@@ -433,15 +443,18 @@ if (!function_exists('addon_export_sql')) {
 
         // 获取所有表
         $tables = $db->query("SHOW TABLES");
-
+        $savePath = get_addon_path($name) . DIRECTORY_SEPARATOR;
+        if (!is_dir($savePath . 'sql')) {
+            @mkdir($savePath . 'sql');
+        }
         // 创建 SQL 文件
-        $sqlFile = get_addon_path() . DIRECTORY_SEPARATOR . time() . '.sql';
+        $sqlFile = $savePath . 'sql' . DIRECTORY_SEPARATOR . time() . '.sql';
         file_put_contents($sqlFile, "SET NAMES utf8mb4;\n\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
         // 遍历表
         $dbName = env('DATABASE.DB_NAME');
         foreach ($tables as $table) {
-            $table_name = $table['Tables_in_' . $dbName]; // 获取表名
-            if (str_starts_with($table_name, $tablePrefix)) {
+            $table_name = array_key_exists('Tables_in_' . $dbName, $table) ? $table['Tables_in_' . $dbName] : ''; // 获取表名
+            if ($table_name && str_starts_with($table_name, $tablePrefix)) {
                 // 导出表结构
                 $createTableSql = $db->query("SHOW CREATE TABLE `$table_name`")[0]['Create Table'];
                 file_put_contents($sqlFile, "\nDROP TABLE IF EXISTS `$table_name`;" . "\n" . $createTableSql . ";\n\n", FILE_APPEND);
@@ -461,6 +474,10 @@ if (!function_exists('addon_export_sql')) {
             }
         }
         file_put_contents($sqlFile, "\n\nSET FOREIGN_KEY_CHECKS = 1;", FILE_APPEND);
+        if ($over) {
+            $savePath .= 'install.sql';
+            file_put_contents($savePath, "\n\nSET FOREIGN_KEY_CHECKS = 1;", FILE_APPEND);
+        }
     }
 }
 
@@ -472,20 +489,24 @@ if (!function_exists('addon_resource_copy')) {
      * @param $dst
      * @return void
      */
-    function addon_resource_copy($src, $dst): void
-    {  // 原目录，复制到的目录
+    function addon_resource_copy($src, $dst, string $name = ''): void
+    {
+        if (!$name) {
+            $name = addon_name();
+        }
+        // 原目录，复制到的目录
         if (!$src) {
             $src = get_addon_path() . DIRECTORY_SEPARATOR . 'assets';
         }
         if (!$dst) {
-            $dst = public_path('addons' . addon_name());
+            $dst = public_path('addons' . $name);
         }
         $dir = opendir($src);
         @mkdir($dst);
         while (false !== ($file = readdir($dir))) {
             if (($file != '.') && ($file != '..')) {
                 if (is_dir($src . DIRECTORY_SEPARATOR . $file)) {
-                    addon_resource_copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
+                    addon_resource_copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file, $name);
                 } else {
                     copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
                 }
@@ -503,10 +524,13 @@ if (!function_exists('addon_resource_remove')) {
      * @param string|null $dir
      * @return void
      */
-    function addon_resource_remove(string $dir = null): void
+    function addon_resource_remove(string $dir = null, string $name = ''): void
     {
+        if (!$name) {
+            $name = addon_name();
+        }
         if (!$dir) {
-            $dir = public_path('addons' . addon_name());
+            $dir = public_path('addons' . $name);
         }
         $dh = @opendir($dir);
         if (!$dh) return;
@@ -532,12 +556,12 @@ if (!function_exists('get_addon_path')) {
      * @param string $addonName
      * @return string
      */
-    function get_addon_path(string $addonName = null): string
+    function get_addon_path(string $name = ''): string
     {
-        if (!$addonName) {
-            $addonName = addon_name();
+        if (!$name) {
+            $name = addon_name();
         }
-        return root_path('addons') . $addonName;
+        return root_path('addons') . $name;
     }
 
 }
@@ -588,20 +612,24 @@ if (!function_exists('addon_resource_copy')) {
      * @param $dst
      * @return void
      */
-    function addon_resource_copy($src = null, $dst = null): void
-    {  // 原目录，复制到的目录
+    function addon_resource_copy($src = null, $dst = null, string $name = ''): void
+    {
+        if (!$name) {
+            $name = addon_name();
+        }
+        // 原目录，复制到的目录
         if (!$src) {
             $src = get_addon_path() . DIRECTORY_SEPARATOR . 'assets';
         }
         if (!$dst) {
-            $dst = public_path('addons' . DIRECTORY_SEPARATOR . addon_name());
+            $dst = public_path('addons' . DIRECTORY_SEPARATOR . $name);
         }
         $dir = opendir($src);
         @mkdir($dst);
         while (false !== ($file = readdir($dir))) {
             if (($file != '.') && ($file != '..')) {
                 if (is_dir($src . DIRECTORY_SEPARATOR . $file)) {
-                    addon_resource_copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
+                    addon_resource_copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file, $name);
                 } else {
                     copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
                 }
@@ -619,11 +647,12 @@ if (!function_exists('addon_resource_remove')) {
      * @param string|null $dir
      * @return void
      */
-    function addon_resource_remove(string $dir = null): void
+    function addon_resource_remove(string $dir = null, string $name = ''): void
     {
-        if (!$dir) {
-            $dir = public_path('addons' .DIRECTORY_SEPARATOR. addon_name());
+        if (!$name) {
+            $name = addon_name();
         }
+        $dir = public_path('addons' . DIRECTORY_SEPARATOR . $name);
         $dh = @opendir($dir);
         if (!$dh) return;
         while ($file = @readdir($dh)) {
@@ -632,7 +661,7 @@ if (!function_exists('addon_resource_remove')) {
                 if (!is_dir($fullPath)) {
                     @unlink($fullPath);
                 } else {
-                    addon_resource_remove($fullPath);
+                    addon_resource_remove($fullPath, $name);
                 }
             }
         }
