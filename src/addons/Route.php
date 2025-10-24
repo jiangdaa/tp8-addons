@@ -29,7 +29,6 @@ class Route
         $addon = $request->route('addon');
         $controller = $request->route('controller');
         $action = $request->route('action');
-
         // TODO: 判断是不是多应用插件
         $module = $request->route('module','');
         // 触发addons_begin事件,可以在事件处理程序中进行一些全局的初始化操作
@@ -44,7 +43,7 @@ class Route
         $request->setController($controller)->setAction($action);
         // 获取插件的信息,如果插件不存在,抛出HTTP异常
         $info = get_addons_info($addon);
-        if (!$info) {
+        if (!$info || !$info['install']) {
             throw new HttpException(404, lang('addon %s not found', [$addon]));
         }
         // 检查插件是否被禁用,如果被禁用,抛出HTTP异常

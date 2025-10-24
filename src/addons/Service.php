@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace tp8a\addons;
 
+use core\middleware\InitMiddleware;
 use think\helper\Arr;
 use tp8a\utils\FileHelper;
 use think\facade\Cache;
@@ -29,6 +30,7 @@ class Service extends \think\Service
      */
     public function register()
     {
+
         // 设置插件路径,用于后续插件的查找和加载
         $this->addons_path = $this->getAddonsPath();
         // 加载插件的语言包,支持多语言环境
@@ -45,23 +47,27 @@ class Service extends \think\Service
         $this->app->bind('addons', Service::class);
     }
 
-    private function getConfigFile($addonName, $moduleName, $field)
+    private function getAddonConfig($addonName, $field)
     {
         $addonsPath = $this->app->addons->getAddonsPath();
-        $routes = [];
-        $routeMapFile = $addonsPath . $addonName . DIRECTORY_SEPARATOR . 'config.php';
+        $configFile = $addonsPath . $addonName . DIRECTORY_SEPARATOR . 'config.php';
         // 获取自定义的路由
-        if (is_file($routeMapFile)) {
-            $routes = include $routeMapFile;
-            $routes = Arr::get($routes, $field, []);
-        }
-        $_r = [];
-        foreach ($routes as $name => $route) {
-            if (is_string($route)) {
-                $_r[$name] = str_starts_with($route, '/addons') ? $route : '/addons/' . $addonName . '/' . $route;
+        if (is_file($configFile)) {
+            $configs = include $configFile;
+            $values = Arr::get($configs, $field, []);
+            if ($field == 'route') {
+                $routes = [];
+                foreach ($values as $name => $route) {
+                    if (is_string($route)) {
+                        $routes[$name] = str_starts_with($route, 'addons') ? $route : 'addons/' . $addonName . '/' . $route;
+                    }
+                }
+                return $routes;
             }
+            return $values;
         }
-        return $_r;
+        return null;
+
     }
 
     private function getMultiApps($addon)
@@ -74,55 +80,22 @@ class Service extends \think\Service
     }
 
 
-    private function loadAddonRoute()
+    private function getAddonRoutes()
     {
+        // 加载所有插架的路由
         $routes = [];
-        $pathinfo = request()->pathinfo();
-        $middleware = [];
-        if ($pathinfo && str_starts_with($pathinfo, 'addons/')) {
-            list(, $addonName) = explode('/', $pathinfo);
-            $isModuleMode = $this->getMultiApps($addonName);
-            if ($isModuleMode) {
-                $urlChunks = explode('/', $pathinfo);
-                list(, , $moduleName) = $urlChunks;
-                $routes = $this->getConfigFile($addonName, $moduleName, 'routes');
-                $tempMiddleware = $this->getConfigFile($addonName, $moduleName, 'middleware');
-            } else {
-                $routes = $this->getConfigFile($addonName, '', 'routes');
-                $tempMiddleware = $this->getConfigFile($addonName, '', 'middleware');
-            }
-            foreach ($tempMiddleware as $item) {
-                if (is_string($item) && class_exists($item)) {
-                    $middleware[] = $item;
-                }
-            }
-            $this->app->middleware->import($middleware, 'route');
-        } else {
-            // 加载所有插架的路由
-            $addonsPath = $this->app->addons->getAddonsPath();
-            $addonsDirs = scandir($addonsPath);
-            foreach ($addonsDirs as $addonsDir) {
-                if (!str_contains($addonsDir, '.')) {
-                    $info = $this->getMultiApps($addonsDir);
-                    if ($info) {
-                        // 多应用
-                        foreach ($info as $app) {
-                            $routes = array_merge($routes, $this->getConfigFile($addonsDir, $app, 'route'));
-                            $middleware = array_merge($middleware, $this->getConfigFile($addonsDir, $app, 'middleware'));
-                        }
-                    } else {
-                        // 单应用
-                        $routes = $this->getConfigFile($addonsDir, '', 'route');
-                        $tempMiddleware = $this->getConfigFile($addonsDir, '', 'middleware');
-                        foreach ($tempMiddleware as $item) {
-                            if (is_string($item) && class_exists($item)) {
-                                $middleware[] = $item;
-                            }
-                        }
+        $addonsPath = $this->app->addons->getAddonsPath();
+        $addonsDirs = scandir($addonsPath);
+        foreach ($addonsDirs as $addonsDir) {
+            if (!str_contains($addonsDir, '.')) {
+                $addonInfo = get_addons_info($addonsDir);
+                if ($addonInfo && $addonInfo['status'] == 1 && $addonInfo['install'] == 1) {
+                    if (!array_key_exists($addonsDir, $routes)) {
+                        $routes[$addonsDir] = [];
                     }
+                    $routes[$addonsDir] = array_merge($routes[$addonsDir], $this->getAddonConfig($addonsDir, 'route'));
                 }
             }
-            $this->app->middleware->import($middleware, 'route');
         }
 
         return $routes;
@@ -134,65 +107,56 @@ class Service extends \think\Service
      */
     public function boot()
     {
+
         // 注册路由规则
         $this->registerRoutes(function (Route $route) {
+
             // 定义执行插件路由的闭包函数
             // 路由脚本
             $execute = '\\tp8a\\addons\\Route@execute';
+            $addonPrefix = 'addons/';
             // 检查并导入插件的中间件
             // 注册控制器路由
-            $route->rule("addons/:addon/[:module]/:controller/:action$", $execute);
-            // 从配置中获取自定义的插件路由规则
-            // 自定义路由
-            $routes = (array)Config::get('addons.route', []);
-            $routes = array_merge($routes, $this->loadAddonRoute());
+            $route->rule("{$addonPrefix}:addon/[:module]/:controller/:action$", $execute);
 
-            foreach ($routes as $key => $val) {
-                // 忽略空的路由配置
-                if (!$val) {
-                    continue;
-                }
-                if (!is_string($val)) {
-                    continue;
-                }
-                if (str_starts_with($val, '/addons/')) {
-                    $count = 1;
-                    $val = str_replace('/addons/', '', $val, $count);
-                }
-                if (str_starts_with($val, '/')) {
-                    $val = mb_substr($val, 1);
-                }
-                // 处理不包含域名的路由配置
-                // 解析路由规则并构建规则数组
-                $r = explode('/', $val);
-                list($addon) = $r;
-                $apps = $this->getMultiApps($addon);
-                if ($addon) {
-                    if ($apps) {
-                        list(, $app, $controller, $action) = $r;
-                        if (in_array($app, $apps)) {
-                            $route->rule($key, $execute)
-                                ->name($key)
-                                ->completeMatch(true)
-                                ->append([
-                                    'addon' => $addon,
-                                    'module' => $app,
-                                    'controller' => $controller,
-                                    'action' => $action
-                                ]);
-                        }
-
-                    } else {
-                        list(, $controller, $action) = $r;
-                        $route->rule($key, $execute)
-                            ->name($key)
-                            ->completeMatch(true)
-                            ->append([
+            $pathinfo = request()->pathinfo();
+            if (!str_starts_with($pathinfo, $addonPrefix)) {
+                // 加载所有插件路由表
+                $routes = $this->getAddonRoutes();
+                $routes = array_merge(...array_values($routes));
+                foreach ($routes as $key => $path) {
+                    if ($path) {
+                        $uris = explode('/', $path);
+                        $appends = [];
+                        $app = null;
+                        if (count($uris) == 5) {
+                            list(,$addon, $app, $controller, $action) = $uris;
+                            $appends = [
+                                'addon' => $addon,
+                                'module' => $app,
+                                'controller' => $controller,
+                                'action' => $action
+                            ];
+                        } else {
+                            list(,$addon, $controller, $action) = $uris;
+                            $appends = [
                                 'addon' => $addon,
                                 'controller' => $controller,
                                 'action' => $action
-                            ]);
+                            ];
+                        }
+                        $routeBuilder = $route->rule($key, $execute)
+                            ->completeMatch(true)
+                            ->append($appends);
+                        $allMiddleware = $this->getAddonConfig($addon, 'middleware');
+                        $globalMiddleware = array_filter(array_values($allMiddleware), function ($item) {
+                            return is_string($item);
+                        }) ?? [];
+                        $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
+                        // 加载中间件
+                        $routeBuilder->middleware(array_merge($globalMiddleware, $moduleMiddlewares));
                     }
+
                 }
 
             }
@@ -348,7 +312,8 @@ class Service extends \think\Service
      *
      * @return string 返回插件目录的路径.如果无法创建目录或获取路径失败,可能返回错误信息
      */
-    public function getAddonsPath()
+    public
+    function getAddonsPath()
     {
         // 构建插件目录的路径
         $addons_path = $this->app->getRootPath() . 'addons' . DIRECTORY_SEPARATOR;
@@ -371,7 +336,8 @@ class Service extends \think\Service
      *
      * @return mixed|array 返回插件的配置信息.如果插件不存在或无法实例化,则返回空数组
      */
-    public function getAddonsConfig()
+    public
+    function getAddonsConfig()
     {
         // 通过应用的请求对象获取当前请求的插件名称
         $name = $this->app->request->addon;
