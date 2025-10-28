@@ -159,7 +159,7 @@ class Service extends \think\Service
             ->completeMatch(true)
             ->append($appends);
         $allMiddleware = $this->getAddonConfig($addon, 'middleware');
-        $globalMiddleware = array_filter(array_values($allMiddleware), function ($item) {
+        $globalMiddleware = array_filter(array_values($allMiddleware ?? []), function ($item) {
             return is_string($item);
         }) ?? [];
         $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
