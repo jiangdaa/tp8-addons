@@ -117,7 +117,6 @@ class Service extends \think\Service
             $addonPrefix = 'addons/';
             // 检查并导入插件的中间件
             // 注册控制器路由
-            $route->rule("{$addonPrefix}:addon/[:module]/:controller/:action$", $execute);
 
             $pathinfo = request()->pathinfo();
             if (!str_starts_with($pathinfo, $addonPrefix)) {
@@ -126,42 +125,48 @@ class Service extends \think\Service
                 $routes = array_merge(...array_values($routes));
                 foreach ($routes as $key => $path) {
                     if ($path) {
-                        $uris = explode('/', $path);
-                        $appends = [];
-                        $app = null;
-                        if (count($uris) == 5) {
-                            list(,$addon, $app, $controller, $action) = $uris;
-                            $appends = [
-                                'addon' => $addon,
-                                'module' => $app,
-                                'controller' => $controller,
-                                'action' => $action
-                            ];
-                        } else {
-                            list(,$addon, $controller, $action) = $uris;
-                            $appends = [
-                                'addon' => $addon,
-                                'controller' => $controller,
-                                'action' => $action
-                            ];
-                        }
-                        $routeBuilder = $route->rule($key, $execute)
-                            ->completeMatch(true)
-                            ->append($appends);
-                        $allMiddleware = $this->getAddonConfig($addon, 'middleware');
-                        $globalMiddleware = array_filter(array_values($allMiddleware), function ($item) {
-                            return is_string($item);
-                        }) ?? [];
-                        $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
-                        // 加载中间件
-                        $routeBuilder->middleware(array_merge($globalMiddleware, $moduleMiddlewares));
+                        $this->buildRouteRules($route, $execute, $key, $path);
                     }
-
                 }
-
+            } else {
+                $this->buildRouteRules($route, $execute, "{$addonPrefix}:addon/[:module]/:controller/:action$", $pathinfo);
             }
         });
     }
+
+    private function buildRouteRules(Route $route, $execute, $key, $path)
+    {
+        $uris = explode('/', $path);
+        $appends = [];
+        $app = null;
+        if (count($uris) == 5) {
+            list(, $addon, $app, $controller, $action) = $uris;
+            $appends = [
+                'addon' => $addon,
+                'module' => $app,
+                'controller' => $controller,
+                'action' => $action
+            ];
+        } else {
+            list(, $addon, $controller, $action) = $uris;
+            $appends = [
+                'addon' => $addon,
+                'controller' => $controller,
+                'action' => $action
+            ];
+        }
+        $routeBuilder = $route->rule($key, $execute)
+            ->completeMatch(true)
+            ->append($appends);
+        $allMiddleware = $this->getAddonConfig($addon, 'middleware');
+        $globalMiddleware = array_filter(array_values($allMiddleware), function ($item) {
+            return is_string($item);
+        }) ?? [];
+        $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
+        // 加载中间件
+        $routeBuilder->middleware(array_merge($globalMiddleware, $moduleMiddlewares));
+    }
+
 
     /**
      * 插件事件加载函数
@@ -277,6 +282,9 @@ class Service extends \think\Service
             $info = pathinfo($addons_file);
             $name = pathinfo($info['dirname'], PATHINFO_FILENAME);
             // 如果文件名是plugin.php,则认为该文件定义了插件的钩子方法
+            if (strtolower($info['filename']) === 'function') {
+                require_once $addons_file;
+            }
             if (strtolower($info['filename']) === 'plugin') {
                 // 获取插件类的所有方法
                 $methods = (array)get_class_methods("\\addons\\" . $name . "\\" . $info['filename']);
@@ -312,8 +320,7 @@ class Service extends \think\Service
      *
      * @return string 返回插件目录的路径.如果无法创建目录或获取路径失败,可能返回错误信息
      */
-    public
-    function getAddonsPath()
+    public function getAddonsPath()
     {
         // 构建插件目录的路径
         $addons_path = $this->app->getRootPath() . 'addons' . DIRECTORY_SEPARATOR;
@@ -336,8 +343,7 @@ class Service extends \think\Service
      *
      * @return mixed|array 返回插件的配置信息.如果插件不存在或无法实例化,则返回空数组
      */
-    public
-    function getAddonsConfig()
+    public function getAddonsConfig()
     {
         // 通过应用的请求对象获取当前请求的插件名称
         $name = $this->app->request->addon;
