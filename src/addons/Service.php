@@ -164,7 +164,7 @@ class Service extends \think\Service
             $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
             $routeBuilder->middleware($moduleMiddlewares);
         }else{
-            $routeBuilder->middleware($allMiddleware);
+            $routeBuilder->middleware($allMiddleware ?? []);
         }
     }
 

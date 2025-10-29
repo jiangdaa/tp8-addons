@@ -309,16 +309,36 @@ if (!function_exists('addon_reg_menu')) {
      * @param string $icon
      * @return string[]
      */
-    function addon_reg_menu(string $name, string $path, string $type, array $children = [], string $icon = ''): array
+    function addon_reg_menu(string $name, string $path, string $type, array $children = [], string $icon = 'fas fa-circle'): array
     {
-        if (!str_starts_with($path, '/addons')) {
-            $addonName = addon_name();
-            $path = "/addons/{$addonName}/{$path}";
+        if (str_starts_with($path, ':')) {
+            $path = substr($path, 1);
+        } else {
+            if (!str_starts_with($path, '/addons')) {
+                $addonName = addon_name();
+                $path = "/addons/{$addonName}/{$path}";
+            }
         }
         $m = ['name' => $name, 'icon' => $icon, 'path' => $path, 'type' => $type];
         if (count($children)) {
             $m['children'] = $children;
         }
+        return $m;
+    }
+}
+
+
+if (!function_exists('addon_reg_config_menu')) {
+    /**
+     * 注册系统菜单
+     * @param string $name
+     * @param string $code
+     * @param string $icon
+     * @return string[]
+     */
+    function addon_reg_config_menu(string $name, string $code, string $icon = 'fas fa-circle'): array
+    {
+        $m = ['name' => $name, 'icon' => $icon, 'path' => '/backend/system.configManage/list?config_group=' . $code, 'type' => 'M'];
         return $m;
     }
 }
