@@ -159,12 +159,13 @@ class Service extends \think\Service
             ->completeMatch(true)
             ->append($appends);
         $allMiddleware = $this->getAddonConfig($addon, 'middleware');
-        $globalMiddleware = array_filter(array_values($allMiddleware ?? []), function ($item) {
-            return is_string($item);
-        }) ?? [];
-        $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
-        // 加载中间件
-        $routeBuilder->middleware(array_merge($globalMiddleware, $moduleMiddlewares));
+        if ($app){
+            // 加载模块的中间件
+            $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
+            $routeBuilder->middleware($moduleMiddlewares);
+        }else{
+            $routeBuilder->middleware($allMiddleware);
+        }
     }
 
 
