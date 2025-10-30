@@ -7,6 +7,7 @@ use think\facade\Event;
 use think\facade\Route;
 use think\facade\App;
 use think\helper\Str;
+use tp8a\addons\HookRegistry;
 
 // 插件类库自动载入
 spl_autoload_register(function ($class) {
@@ -298,6 +299,36 @@ if (!function_exists('addons_config')) {
         return null;
     }
 }
+
+if (!function_exists('addon_event_register')) {
+    /**
+     * 注册钩子
+     * @param string $name
+     * @param callable $callback
+     * @return void
+     */
+    function addon_event_register(string $name, callable $callback): void
+    {
+        HookRegistry::register($name, $callback);
+    }
+}
+
+if (!function_exists('addon_event_trigger')) {
+    /**
+     * 触发钩子
+     * @param string $name
+     * @param array $values
+     * @param mixed|null $return
+     * @return mixed
+     */
+    function addon_event_trigger(string $name, array $values): mixed
+    {
+        HookRegistry::trigger($name, $values, $return);
+        return $return;
+    }
+}
+
+
 
 if (!function_exists('addon_reg_menu')) {
     /**

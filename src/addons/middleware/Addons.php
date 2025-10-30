@@ -20,7 +20,7 @@ class Addons
      */
     public function __construct(App $app)
     {
-        $this->app  = $app;
+        $this->app = $app;
     }
 
     /**
@@ -35,8 +35,10 @@ class Addons
     public function handle($request, \Closure $next)
     {
         // 执行插件中间件钩子,允许插件注册的中间件在此处运行。
-        hook('addon_middleware', $request);
-        // 继续处理请求,通过传递请求给下一个中间件或最终处理函数。
+        $res = addon_event_trigger('addon_middleware_init', [$request, $next]);
+        if($res){
+            return $res;
+        }
         return $next($request);
     }
 }

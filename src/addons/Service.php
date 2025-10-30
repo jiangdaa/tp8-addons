@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace tp8a\addons;
 
-use core\middleware\InitMiddleware;
+
 use think\helper\Arr;
+use tp8a\addons\middleware\Addons;
 use tp8a\utils\FileHelper;
 use think\facade\Cache;
 use think\facade\Config;
@@ -45,6 +46,7 @@ class Service extends \think\Service
         $this->loadService();
         // 将插件服务绑定到应用容器,方便随时获取和使用
         $this->app->bind('addons', Service::class);
+
     }
 
     private function getAddonConfig($addonName, $field)
@@ -158,13 +160,14 @@ class Service extends \think\Service
         $routeBuilder = $route->rule($key, $execute)
             ->completeMatch(true)
             ->append($appends);
-        $allMiddleware = $this->getAddonConfig($addon, 'middleware');
-        if ($app){
+        $allMiddleware = array_merge([Addons::class], $this->getAddonConfig($addon, 'middleware'));
+
+        if ($app) {
             // 加载模块的中间件
             $moduleMiddlewares = Arr::get($allMiddleware, $app, []);
-            $routeBuilder->middleware($moduleMiddlewares);
-        }else{
-            $routeBuilder->middleware($allMiddleware ?? []);
+            $routeBuilder->middleware(array_merge([Addons::class], $moduleMiddlewares));
+        } else {
+            $routeBuilder->middleware(array_merge([Addons::class], $allMiddleware ?? []));
         }
     }
 
@@ -204,13 +207,7 @@ class Service extends \think\Service
             // 将处理后的钩子信息缓存起来
             Cache::set('hooks', $hooks);
         }
-        // 如果存在'AddonsInit'钩子,触发该钩子对应的插件事件
-        if (isset($hooks['AddonsInit'])) {
-            foreach ($hooks['AddonsInit'] as $k => $v) {
-                Event::trigger('AddonsInit', $v);
-            }
-        }
-        // 注册处理所有钩子事件的监听器
+
         Event::listenEvents($hooks);
     }
 
@@ -261,6 +258,18 @@ class Service extends \think\Service
         $this->app->bind($bind);
     }
 
+    private function pathToNamespace($filePath, $rootNamespace)
+    {
+        $filePath = substr($filePath, strpos($filePath, '\\addons\\'), -4);
+        // 1. 将反斜杠和正斜杠替换为反斜杠
+        $filePath = str_replace(['/', '\\'], '\\', $filePath);
+
+        // 5. 将相对路径与根命名空间结合
+        $namespace = $rootNamespace . str_replace('\\', '\\', $filePath);
+
+        return $namespace;
+    }
+
     /**
      * 自动加载插件的函数
      * 该函数用于在满足特定条件下自动加载插件,并更新配置以注册插件的钩子
@@ -286,6 +295,14 @@ class Service extends \think\Service
             if (strtolower($info['filename']) === 'function') {
                 require_once $addons_file;
             }
+            if (strtolower($info['filename']) === 'subscribe') {
+                // 订阅初始化
+                $c = $this->pathToNamespace($addons_file, $name = '');
+                // 注册处理所有钩子事件的监听器
+                // 如果存在'AddonsInit'钩子,触发该钩子对应的插件事件
+                new $c();
+                addon_event_trigger('addon_init', []);
+            }
             if (strtolower($info['filename']) === 'plugin') {
                 // 获取插件类的所有方法
                 $methods = (array)get_class_methods("\\addons\\" . $name . "\\" . $info['filename']);
@@ -308,6 +325,7 @@ class Service extends \think\Service
                 }
             }
         }
+
         // 更新配置,保存注册的插件钩子
         Config::set($config, 'addons');
     }
