@@ -1,6 +1,6 @@
 <?php
 
-namespace tp8a\addons;
+namespace tp8a\hooks;
 
 class HookRegistry
 {

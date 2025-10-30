@@ -7,7 +7,7 @@ use think\facade\Event;
 use think\facade\Route;
 use think\facade\App;
 use think\helper\Str;
-use tp8a\addons\HookRegistry;
+use tp8a\hooks\HookRegistry;
 
 // 插件类库自动载入
 spl_autoload_register(function ($class) {
