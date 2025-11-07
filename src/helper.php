@@ -502,9 +502,11 @@ if (!function_exists('addon_export_sql')) {
         $sqlFile = $savePath . 'sql' . DIRECTORY_SEPARATOR . time() . '.sql';
         file_put_contents($sqlFile, "SET NAMES utf8mb4;\n\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
         // 遍历表
-        $dbName = env('DATABASE.DB_NAME');
+        $dbName = env('MYSQL_DB.NAME');
+        $aa = [];
         foreach ($tables as $table) {
             $table_name = array_key_exists('Tables_in_' . $dbName, $table) ? $table['Tables_in_' . $dbName] : ''; // 获取表名
+            $aa[] = ['Tables_in_' . $dbName,$table];
             if ($table_name && str_starts_with($table_name, $tablePrefix)) {
                 // 导出表结构
                 $createTableSql = $db->query("SHOW CREATE TABLE `$table_name`")[0]['Create Table'];
@@ -515,8 +517,9 @@ if (!function_exists('addon_export_sql')) {
                 $insertSql = "BEGIN;\n";
                 foreach ($data as $row) {
                     $columns = array_keys($row);
+
                     $values = array_map(function ($value) {
-                        return is_null($value) ? 'NULL' : "'" . addslashes($value) . "'";
+                        return is_null($value) ? 'NULL' : "'" . addslashes($value.'') . "'";
                     }, array_values($row));
                     $insertSql .= "INSERT INTO `$table_name` (`" . implode('`, `', $columns) . "`) VALUES (" . implode(', ', $values) . ");\n";
                 }
