@@ -260,7 +260,7 @@ class Service extends \think\Service
 
     private function pathToNamespace($filePath, $rootNamespace)
     {
-        $filePath = substr($filePath, strpos($filePath, '\\addons\\'), -4);
+        $filePath = substr($filePath, strpos($filePath, str_contains(PHP_OS, 'WIN') ? '\\addons\\' :'/addons/'), -4);
         // 1. 将反斜杠和正斜杠替换为反斜杠
         $filePath = str_replace(['/', '\\'], '\\', $filePath);
 
