@@ -7,6 +7,7 @@ use think\facade\Event;
 use think\facade\Route;
 use think\facade\App;
 use think\helper\Str;
+use think\route\Url;
 use tp8a\hooks\HookRegistry;
 
 // 插件类库自动载入
@@ -240,7 +241,7 @@ if (!function_exists('addons_url')) {
      * @param array $param URL中的参数,以键值对形式提供
      * @param bool|string $suffix URL的后缀,可以是true（使用配置的默认后缀）或者具体的后缀字符串
      * @param bool|string $domain 是否使用域名,可以是true（使用配置的默认域名）或者具体的域名字符串
-     * @return mixed|bool|string 返回生成的URL字符串,如果无法生成则返回false
+     * @return mixed 返回生成的URL字符串,如果无法生成则返回false
      */
     function addons_url(string $url = '', array $param = [], bool|string $suffix = true, bool|string $domain = false): mixed
     {
@@ -284,9 +285,36 @@ if (!function_exists('addons_url')) {
     }
 }
 
+if (!function_exists('addons_real_url')) {
+    /**
+     * 获取插件相对url
+     * @param Url $url
+     * @return Url
+     */
+    function addons_real_url(Url $url): Url
+    {
+        if ($addon = request()->route('addon')) {
+            $buildUrl = $url->build();
+            $module = request()->route('module');
+            if ($module) {
+                $buildUrl = preg_replace('/(\/.*?\/)/', "/{$module}/", $buildUrl);
+            }
+            $url = url('/addons/' . $addon . $buildUrl);
+        }
+        return $url;
+    }
+
+}
+
 if (!function_exists('addons_config')) {
 
-    function addons_config(string $field, string $name): mixed
+    /**
+     * 获取插件配置项
+     * @param string $field
+     * @param string $name
+     * @return mixed
+     */
+    function addons_config(string $field, string $name = ''): mixed
     {
         if (!$name) {
             $name = addon_name();
@@ -294,31 +322,30 @@ if (!function_exists('addons_config')) {
         $configPath = get_addon_path($name) . DIRECTORY_SEPARATOR . 'config.php';
         if (is_file($configPath)) {
             $res = require $configPath;
-            return $res[$field] ?? null;
+            return \think\helper\Arr::get($res, $field);
         }
         return null;
     }
 }
 
-if (!function_exists('addon_event_register')) {
+if (!function_exists('addons_event_register')) {
     /**
      * 注册钩子
      * @param string $name
      * @param callable $callback
      * @return void
      */
-    function addon_event_register(string $name, callable $callback): void
+    function addons_event_register(string $name, callable $callback): void
     {
         HookRegistry::register($name, $callback);
     }
 }
 
-if (!function_exists('addon_event_trigger')) {
+if (!function_exists('addons_event_trigger')) {
     /**
      * 触发钩子
      * @param string $name
      * @param array $values
-     * @param mixed|null $return
      * @return mixed
      */
     function addon_event_trigger(string $name, array $values): mixed
@@ -327,7 +354,6 @@ if (!function_exists('addon_event_trigger')) {
         return $return;
     }
 }
-
 
 
 if (!function_exists('addon_reg_menu')) {
@@ -369,8 +395,7 @@ if (!function_exists('addon_reg_config_menu')) {
      */
     function addon_reg_config_menu(string $name, string $code, string $icon = 'fas fa-circle'): array
     {
-        $m = ['name' => $name, 'icon' => $icon, 'path' => '/backend/system.configManage/list?config_group=' . $code, 'type' => 'M'];
-        return $m;
+        return ['name' => $name, 'icon' => $icon, 'path' => '/backend/system.configManage/list?config_group=' . $code, 'type' => 'M'];
     }
 }
 
@@ -506,7 +531,7 @@ if (!function_exists('addon_export_sql')) {
         $aa = [];
         foreach ($tables as $table) {
             $table_name = array_key_exists('Tables_in_' . $dbName, $table) ? $table['Tables_in_' . $dbName] : ''; // 获取表名
-            $aa[] = ['Tables_in_' . $dbName,$table];
+            $aa[] = ['Tables_in_' . $dbName, $table];
             if ($table_name && str_starts_with($table_name, $tablePrefix)) {
                 // 导出表结构
                 $createTableSql = $db->query("SHOW CREATE TABLE `$table_name`")[0]['Create Table'];
@@ -519,7 +544,7 @@ if (!function_exists('addon_export_sql')) {
                     $columns = array_keys($row);
 
                     $values = array_map(function ($value) {
-                        return is_null($value) ? 'NULL' : "'" . addslashes($value.'') . "'";
+                        return is_null($value) ? 'NULL' : "'" . addslashes($value . '') . "'";
                     }, array_values($row));
                     $insertSql .= "INSERT INTO `$table_name` (`" . implode('`, `', $columns) . "`) VALUES (" . implode(', ', $values) . ");\n";
                 }
@@ -535,79 +560,11 @@ if (!function_exists('addon_export_sql')) {
     }
 }
 
-if (!function_exists('addon_resource_copy')) {
-
-    /**
-     * 复制插件包资源文件
-     * @param $src
-     * @param $dst
-     * @return void
-     */
-    function addon_resource_copy($src, $dst, string $name = ''): void
-    {
-        if (!$name) {
-            $name = addon_name();
-        }
-        // 原目录，复制到的目录
-        if (!$src) {
-            $src = get_addon_path() . DIRECTORY_SEPARATOR . 'assets';
-        }
-        if (!$dst) {
-            $dst = public_path('addons' . $name);
-        }
-        $dir = opendir($src);
-        @mkdir($dst);
-        while (false !== ($file = readdir($dir))) {
-            if (($file != '.') && ($file != '..')) {
-                if (is_dir($src . DIRECTORY_SEPARATOR . $file)) {
-                    addon_resource_copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file, $name);
-                } else {
-                    copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
-                }
-            }
-        }
-        closedir($dir);
-    }
-
-}
-
-if (!function_exists('addon_resource_remove')) {
-
-    /**
-     * 删除插件资源文件
-     * @param string|null $dir
-     * @return void
-     */
-    function addon_resource_remove(string $dir = null, string $name = ''): void
-    {
-        if (!$name) {
-            $name = addon_name();
-        }
-        if (!$dir) {
-            $dir = public_path('addons' . $name);
-        }
-        $dh = @opendir($dir);
-        if (!$dh) return;
-        while ($file = @readdir($dh)) {
-            if ($file != "." && $file != "..") {
-                $fullPath = $dir . DIRECTORY_SEPARATOR . $file;
-                if (!is_dir($fullPath)) {
-                    @unlink($fullPath);
-                } else {
-                    addon_resource_remove($fullPath);
-                }
-            }
-        }
-        closedir($dh);
-        @rmdir($dir);
-    }
-}
-
 if (!function_exists('get_addon_path')) {
 
     /**
      * 获取插件路径
-     * @param string $addonName
+     * @param string $name
      * @return string
      */
     function get_addon_path(string $name = ''): string
